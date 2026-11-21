@@ -1,0 +1,9 @@
+.Rproj.user
+dados/brutos/
+referencias/*.pdf
+*[Tt]oken*
+.Rhistory
+.RData
+.httr-oauth
+.DS_Store
+.quarto
