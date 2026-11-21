@@ -21,6 +21,10 @@ source("R/00_pacotes.R")
 painel    <- readRDS("dados/tratados/base_painel.rds")
 dispersao <- readRDS("dados/tratados/dispersao_ufs.rds")
 
+composicao <- readRDS("dados/tratados/composicao_populacao.rds")
+cores_comp <- c("Menores de 14 anos" = "#b8c4c9", "Fora da força de trabalho" = "#e0a458",
+                "Desocupados" = "#c8553d", "Ocupados" = "#0f4c5c")
+
 regioes   <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")
 cores_reg <- c(Norte = "#2a9d8f", Nordeste = "#c8553d", Sudeste = "#0f4c5c",
                Sul = "#e0a458", `Centro-Oeste` = "#8d6a9f", Brasil = "#22303a")
@@ -105,6 +109,25 @@ disp_plot <- function(var, eixo) {
     labs(x = NULL, y = eixo) +
     theme_minimal(base_size = 10)
   ggplotly(g, tooltip = "text")
+}
+
+comp_plot <- function(niveis, ncol) {
+  d <- composicao |>
+    filter(nivel %in% niveis, !is.na(pct)) |>
+    mutate(local = factor(local, levels = unique(local)),
+           texto = paste0(local, " — ", tri, "º tri ", ano, "<br>", componente, ": ",
+                          scales::number(pct, accuracy = 0.1, decimal.mark = ","), "% (",
+                          scales::number(pessoas, big.mark = "."), " mil pessoas)"))
+  g <- ggplot(d, aes(data, pct, fill = componente, text = texto)) +
+    geom_col(width = 80) +
+    facet_wrap(~ local, ncol = ncol) +
+    scale_fill_manual(values = cores_comp, name = NULL) +
+        scale_y_continuous(breaks = c(0, 50, 100), labels = \(x) paste0(x, "%")) +
+    labs(x = NULL, y = NULL) +
+        theme_minimal(base_size = 9) +
+    theme(panel.spacing = unit(1.2, "lines"), panel.grid.minor = element_blank())
+    ggplotly(g, tooltip = "text") |>
+    layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.08, yanchor = "top"))
 }
 
 maior_desoc <- ult |> slice_max(desocupacao, n = 1)
@@ -243,6 +266,26 @@ serie("informalidade")
 #| title: "Rendimento"
 serie("rendimento")
 ```
+
+# Composição
+
+## Row {.tabset}
+
+```{r}
+#| title: "Brasil e regiões · % da população total"
+comp_plot(c("Brasil", "Grande Região"), ncol = 3)
+```
+
+```{r}
+#| title: "Unidades da Federação"
+comp_plot("Unidade da Federação", ncol = 7)
+```
+
+## Row {height=12%}
+
+::: {.card}
+Cada barra soma 100% da população residente no trimestre. Fontes: SIDRA, tabelas 5917 (população) e 4093 (condição em relação à força de trabalho, 14 anos ou mais); menores de 14 = população − pessoas de 14 anos ou mais. Para regiões e UFs, o IBGE não divulgou estimativas em número de pessoas do 2º tri de 2020 ao 1º tri de 2022 (pandemia), por isso o intervalo em branco.
+:::
 
 # Sobre
 
