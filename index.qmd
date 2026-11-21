@@ -1,0 +1,266 @@
+---
+title: "Discrepâncias regionais no mercado de trabalho — PNAD Contínua"
+author: "Darlynson-Analytics"
+lang: pt
+format:
+  dashboard:
+    theme: [flatly, custom.scss]
+    nav-buttons:
+      - icon: github
+        href: https://github.com/Darlynson-Analytics/PNAD_CONTINUA
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| include: false
+source("R/00_pacotes.R")
+
+painel    <- readRDS("dados/tratados/base_painel.rds")
+dispersao <- readRDS("dados/tratados/dispersao_ufs.rds")
+
+regioes   <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")
+cores_reg <- c(Norte = "#2a9d8f", Nordeste = "#c8553d", Sudeste = "#0f4c5c",
+               Sul = "#e0a458", `Centro-Oeste` = "#8d6a9f", Brasil = "#22303a")
+ind_nomes <- c(desocupacao = "Taxa de desocupação", subutilizacao = "Taxa de subutilização",
+               ocupacao = "Nível da ocupação", informalidade = "Taxa de informalidade",
+               rendimento = "Rendimento médio real")
+
+# formata números no padrão brasileiro
+fmt <- function(x, ind) {
+  if (ind == "rendimento") scales::number(x, accuracy = 1, big.mark = ".", decimal.mark = ",", prefix = "R$ ")
+  else scales::number(x, accuracy = 0.1, decimal.mark = ",", suffix = "%")
+}
+
+ufs <- painel |>
+  filter(nivel == "Unidade da Federação") |>
+  mutate(regiao = unname(regioes[regiao_cod]))
+
+ult_data <- max(painel$data)
+ult <- ufs |> filter(data == ult_data)
+br  <- painel |> filter(nivel == "Brasil", data == ult_data)
+periodo <- paste0(br$tri, "º trimestre de ", br$ano)
+
+# malha das UFs (geobr): baixa uma vez e guarda em cache
+geo_path <- "dados/tratados/ufs_geo.rds"
+if (!file.exists(geo_path)) saveRDS(geobr::read_state(year = 2020, showProgress = FALSE), geo_path)
+geo <- readRDS(geo_path) |>
+  sf::st_cast("MULTIPOLYGON") |>   # plotly exige um tipo único de geometria
+  mutate(cod = as.character(code_state))
+
+# --- funções dos gráficos ---
+mapa <- function(ind) {
+  d <- geo |>
+    left_join(ult, by = "cod") |>
+    mutate(valor = .data[[ind]], texto = paste0(local, ": ", fmt(valor, ind)))
+  g <- ggplot(d) +
+    geom_sf(aes(fill = valor, text = texto), colour = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(option = "mako", direction = -1, name = NULL) +
+    theme_void()
+  ggplotly(g, tooltip = "text")
+}
+
+ranking <- function(ind) {
+  d <- ult |>
+    transmute(local, regiao, valor = .data[[ind]], cv = .data[[paste0(ind, "_cv")]]) |>
+    filter(!is.na(valor)) |>
+    mutate(li = valor * (1 - 1.96 * cv / 100),          # IC 95% aproximado a partir do CV
+           ls = valor * (1 + 1.96 * cv / 100),
+           local = reorder(local, valor),
+           texto = paste0(local, ": ", fmt(valor, ind),
+                          "<br>IC 95%: ", fmt(li, ind), " a ", fmt(ls, ind),
+                          "<br>CV da estimativa: ", cv, "%"))
+  g <- ggplot(d, aes(y = local, colour = regiao, text = texto)) +
+    geom_vline(xintercept = br[[ind]], linetype = "dashed", colour = "grey50") +
+    geom_segment(aes(x = li, xend = ls, yend = local), alpha = 0.5) +
+    geom_point(aes(x = valor), size = 2) +
+    scale_colour_manual(values = cores_reg, name = NULL) +
+    labs(x = NULL, y = NULL) +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.y = element_text(size = 7.5))
+  ggplotly(g, tooltip = "text")
+}
+
+serie <- function(ind) {
+  d <- painel |>
+    filter(nivel != "Unidade da Federação", !is.na(.data[[ind]])) |>
+    mutate(valor = .data[[ind]], texto = paste0(local, " — ", tri, "º tri ", ano, ": ", fmt(valor, ind)))
+  g <- ggplot(d, aes(data, valor, colour = local, group = local, text = texto)) +
+    geom_line(linewidth = 0.7) +
+    scale_colour_manual(values = cores_reg, name = NULL) +
+    labs(x = NULL, y = NULL) +
+    theme_minimal(base_size = 10)
+  ggplotly(g, tooltip = "text")
+}
+
+disp_plot <- function(var, eixo) {
+  d <- dispersao |>
+    mutate(nome = unname(ind_nomes[indicador]), y = .data[[var]],
+           texto = paste0(nome, " — ", tri, "º tri ", ano, ": ", round(y, 1)))
+  g <- ggplot(d, aes(data, y, group = nome, text = texto)) +
+    geom_line(colour = "#0f4c5c", linewidth = 0.7) +
+    facet_wrap(~ nome, scales = "free_y", ncol = 3) +
+    labs(x = NULL, y = eixo) +
+    theme_minimal(base_size = 10)
+  ggplotly(g, tooltip = "text")
+}
+
+maior_desoc <- ult |> slice_max(desocupacao, n = 1)
+razao_rend  <- max(ult$rendimento) / min(ult$rendimento)
+amp_inf     <- max(ult$informalidade) - min(ult$informalidade)
+```
+
+# Visão geral
+
+## Row {height=17%}
+
+```{r}
+#| content: valuebox
+#| title: "Desocupação · Brasil"
+list(color = "#0f4c5c", value = fmt(br$desocupacao, "desocupacao"))
+```
+
+```{r}
+#| content: valuebox
+#| title: "Maior desocupação (UF)"
+list(color = "#c8553d",
+     value = paste0(maior_desoc$local, " · ", fmt(maior_desoc$desocupacao, "desocupacao")))
+```
+
+```{r}
+#| content: valuebox
+#| title: "Rendimento: maior ÷ menor UF"
+list(color = "#e0a458",
+     value = paste0(scales::number(razao_rend, accuracy = 0.1, decimal.mark = ","), " vezes"))
+```
+
+```{r}
+#| content: valuebox
+#| title: "Informalidade: amplitude entre UFs"
+list(color = "#2a9d8f",
+     value = paste0(scales::number(amp_inf, accuracy = 0.1, decimal.mark = ","), " p.p."))
+```
+
+## Row
+
+### Column {.tabset width=45%}
+
+```{r}
+#| title: "Mapa · Desocupação"
+mapa("desocupacao")
+```
+
+```{r}
+#| title: "Subutilização"
+mapa("subutilizacao")
+```
+
+```{r}
+#| title: "Ocupação"
+mapa("ocupacao")
+```
+
+```{r}
+#| title: "Informalidade"
+mapa("informalidade")
+```
+
+```{r}
+#| title: "Rendimento"
+mapa("rendimento")
+```
+
+### Column {.tabset width=55%}
+
+```{r}
+#| title: "Ranking · Desocupação"
+ranking("desocupacao")
+```
+
+```{r}
+#| title: "Subutilização"
+ranking("subutilizacao")
+```
+
+```{r}
+#| title: "Ocupação"
+ranking("ocupacao")
+```
+
+```{r}
+#| title: "Informalidade"
+ranking("informalidade")
+```
+
+```{r}
+#| title: "Rendimento"
+ranking("rendimento")
+```
+
+# Dispersão
+
+## Row
+
+```{r}
+#| title: "Dispersão relativa: coeficiente de variação entre as 27 UFs (%)"
+disp_plot("cv", "CV entre UFs (%)")
+```
+
+## Row
+
+```{r}
+#| title: "Dispersão absoluta: desvio-padrão entre as 27 UFs (p.p.; R$ no rendimento)"
+disp_plot("dp", "Desvio-padrão")
+```
+
+# Regiões
+
+## Row {.tabset}
+
+```{r}
+#| title: "Desocupação"
+serie("desocupacao")
+```
+
+```{r}
+#| title: "Subutilização"
+serie("subutilizacao")
+```
+
+```{r}
+#| title: "Ocupação"
+serie("ocupacao")
+```
+
+```{r}
+#| title: "Informalidade"
+serie("informalidade")
+```
+
+```{r}
+#| title: "Rendimento"
+serie("rendimento")
+```
+
+# Sobre
+
+## Row
+
+::: {.card title="Sobre este painel"}
+**Fonte:** IBGE, Pesquisa Nacional por Amostra de Domicílios Contínua (PNAD Contínua) trimestral, via SIDRA:
+tabelas 4099 (desocupação e subutilização), 6466 (nível da ocupação), 8529 (informalidade, desde o 4º tri de 2015)
+e 6472 (rendimento médio mensal real habitual de todos os trabalhos).
+
+**Recorte:** Brasil, 5 Grandes Regiões e 27 Unidades da Federação, do 1º trimestre de 2012 ao `r periodo`.
+
+**Dispersão entre UFs:** calculada sem ponderação populacional (cada UF pesa igual), pois o interesse é a distância
+entre territórios. O painel mostra a dispersão **relativa** (coeficiente de variação) e a **absoluta** (desvio-padrão):
+com a queda geral da desocupação, o CV pode subir mesmo quando as distâncias em pontos percentuais diminuem.
+
+**Precisão:** nos rankings, as barras indicam um intervalo de confiança de 95% aproximado, obtido a partir do
+coeficiente de variação divulgado pelo IBGE. Diferenças entre UFs cujos intervalos se sobrepõem devem ser lidas com cautela.
+
+**Código:** [github.com/Darlynson-Analytics/PNAD_CONTINUA](https://github.com/Darlynson-Analytics/PNAD_CONTINUA)
+:::

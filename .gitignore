@@ -7,3 +7,8 @@ referencias/*.pdf
 .httr-oauth
 .DS_Store
 .quarto
+
+/.quarto/
+**/*.quarto_ipynb
+saidas/debug.txt
+saidas/index_code.R
