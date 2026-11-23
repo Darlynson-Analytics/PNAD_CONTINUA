@@ -22,12 +22,12 @@ painel    <- readRDS("dados/tratados/base_painel.rds")
 dispersao <- readRDS("dados/tratados/dispersao_ufs.rds")
 
 composicao <- readRDS("dados/tratados/composicao_populacao.rds")
-cores_comp <- c("Menores de 14 anos" = "#b8c4c9", "Fora da força de trabalho" = "#e0a458",
-                "Desocupados" = "#c8553d", "Ocupados" = "#0f4c5c")
+cores_comp <- c("Menores de 14 anos" = "#d9e2ea", "Fora da força de trabalho" = "#9ecae1",
+                "Desocupados" = "#4292c6", "Ocupados" = "#08519c")
 
 regioes   <- c("1" = "Norte", "2" = "Nordeste", "3" = "Sudeste", "4" = "Sul", "5" = "Centro-Oeste")
-cores_reg <- c(Norte = "#2a9d8f", Nordeste = "#c8553d", Sudeste = "#0f4c5c",
-               Sul = "#e0a458", `Centro-Oeste` = "#8d6a9f", Brasil = "#22303a")
+cores_reg <- c(Norte = "#9ecae1", Nordeste = "#6baed6", `Centro-Oeste` = "#4292c6",
+               Sul = "#2171b5", Sudeste = "#08519c", Brasil = "#08306b")
 ind_nomes <- c(desocupacao = "Taxa de desocupação", subutilizacao = "Taxa de subutilização",
                ocupacao = "Nível da ocupação", informalidade = "Taxa de informalidade",
                rendimento = "Rendimento médio real")
@@ -61,7 +61,7 @@ mapa <- function(ind) {
     mutate(valor = .data[[ind]], texto = paste0(local, ": ", fmt(valor, ind)))
   g <- ggplot(d) +
     geom_sf(aes(fill = valor, text = texto), colour = "white", linewidth = 0.2) +
-    scale_fill_viridis_c(option = "mako", direction = -1, name = NULL) +
+    scale_fill_distiller(palette = "Blues", direction = 1, name = NULL) +
     theme_void()
   ggplotly(g, tooltip = "text")
 }
@@ -104,9 +104,9 @@ disp_plot <- function(var, eixo) {
     mutate(nome = unname(ind_nomes[indicador]), y = .data[[var]],
            texto = paste0(nome, " — ", tri, "º tri ", ano, ": ", round(y, 1)))
   g <- ggplot(d, aes(data, y, group = nome, text = texto)) +
-    geom_line(colour = "#0f4c5c", linewidth = 0.7) +
-    facet_wrap(~ nome, scales = "free_y", ncol = 3) +
-    labs(x = NULL, y = eixo) +
+    geom_line(colour = "#08519c", linewidth = 0.7) +
+    facet_wrap(~ nome, scales = "free_y", ncol = 5) +
+    labs(x = NULL, y = NULL) +
     theme_minimal(base_size = 10)
   ggplotly(g, tooltip = "text")
 }
@@ -137,36 +137,36 @@ amp_inf     <- max(ult$informalidade) - min(ult$informalidade)
 
 # Visão geral
 
-## Row {height=17%}
+## Row {height=130px}
 
 ```{r}
 #| content: valuebox
 #| title: "Desocupação · Brasil"
-list(color = "#0f4c5c", value = fmt(br$desocupacao, "desocupacao"))
+list(color = "#0b3c5d", value = fmt(br$desocupacao, "desocupacao"))
 ```
 
 ```{r}
 #| content: valuebox
 #| title: "Maior desocupação (UF)"
-list(color = "#c8553d",
+list(color = "#155e8c",
      value = paste0(maior_desoc$local, " · ", fmt(maior_desoc$desocupacao, "desocupacao")))
 ```
 
 ```{r}
 #| content: valuebox
 #| title: "Rendimento: maior ÷ menor UF"
-list(color = "#e0a458",
+list(color = "#2a7fba",
      value = paste0(scales::number(razao_rend, accuracy = 0.1, decimal.mark = ","), " vezes"))
 ```
 
 ```{r}
 #| content: valuebox
 #| title: "Informalidade: amplitude entre UFs"
-list(color = "#2a9d8f",
+list(color = "#3d8bbf",
      value = paste0(scales::number(amp_inf, accuracy = 0.1, decimal.mark = ","), " p.p."))
 ```
 
-## Row {height=420}
+## Row
 
 ### Column {.tabset width=45%}
 
@@ -240,7 +240,7 @@ disp_plot("dp", "Desvio-padrão")
 
 # Regiões
 
-## ## Row {.tabset height=720}
+## Row {.tabset}
 
 ```{r}
 #| title: "Desocupação"
@@ -317,7 +317,7 @@ barras_uf <- function(var) {
 }
 ```
 
-## Row {height=50%}
+## Row {height=420}
 
 ### Column {width=50%}
 
@@ -327,7 +327,7 @@ d <- painel |>
   filter(nivel == "Brasil") |>
   mutate(texto = paste0(tri, "º tri ", ano, ": ", fmt_bi(massa)))
 g <- ggplot(d, aes(data, massa / 1000, group = 1, text = texto)) +
-  geom_line(colour = "#0f4c5c", linewidth = 0.8) +
+  geom_line(colour = "#08519c", linewidth = 0.8) +
   labs(x = NULL, y = NULL) +
   theme_minimal(base_size = 10)
 ggplotly(g, tooltip = "text")
@@ -350,10 +350,10 @@ g <- ggplot(d, aes(data, part, fill = local, text = texto)) +
   scale_y_continuous(breaks = c(0, 50, 100)) +
   labs(x = NULL, y = NULL) +
   theme_minimal(base_size = 10)
-ggplotly(g, tooltip = "text") |> layout(legend = list(orientation = "h", y = -0.08, yanchor = "top"))
+ggplotly(g, tooltip = "text") |> layout(legend = list(orientation = "h", y = -0.15, yanchor = "top"))
 ```
 
-## Row {.tabset height=50%}
+## Row {.tabset height=720}
 
 ```{r}
 #| title: "UFs · Participação na massa"
@@ -372,7 +372,7 @@ barras_uf("var12")
 ::: {.card title="Sobre este painel"}
 **Fonte:** IBGE, Pesquisa Nacional por Amostra de Domicílios Contínua (PNAD Contínua) trimestral, via SIDRA:
 tabelas 4099 (desocupação e subutilização), 6466 (nível da ocupação), 8529 (informalidade, desde o 4º tri de 2015)
-e 6472 (rendimento médio mensal real habitual de todos os trabalhos) , 6474 (massa de rendimento mensal real habitual de todos os trabalhos, em R$ a preços do último trimestre).
+e 6472 (rendimento médio mensal real habitual de todos os trabalhos), 6474 (massa de rendimento mensal real habitual de todos os trabalhos, em R$ a preços do último trimestre).
 
 **Recorte:** Brasil, 5 Grandes Regiões e 27 Unidades da Federação, do 1º trimestre de 2012 ao `r periodo`.
 
