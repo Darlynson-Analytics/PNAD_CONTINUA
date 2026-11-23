@@ -127,7 +127,7 @@ comp_plot <- function(niveis, ncol) {
         theme_minimal(base_size = 9) +
     theme(panel.spacing = unit(1.2, "lines"), panel.grid.minor = element_blank())
     ggplotly(g, tooltip = "text") |>
-    layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.08, yanchor = "top"))
+    layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.15, yanchor = "top"))
 }
 
 maior_desoc <- ult |> slice_max(desocupacao, n = 1)
@@ -166,7 +166,7 @@ list(color = "#2a9d8f",
      value = paste0(scales::number(amp_inf, accuracy = 0.1, decimal.mark = ","), " p.p."))
 ```
 
-## Row
+## Row {height=420}
 
 ### Column {.tabset width=45%}
 
@@ -240,7 +240,7 @@ disp_plot("dp", "Desvio-padrão")
 
 # Regiões
 
-## Row {.tabset}
+## ## Row {.tabset height=720}
 
 ```{r}
 #| title: "Desocupação"
@@ -287,6 +287,84 @@ comp_plot("Unidade da Federação", ncol = 7)
 Cada barra soma 100% da população residente no trimestre. Fontes: SIDRA, tabelas 5917 (população) e 4093 (condição em relação à força de trabalho, 14 anos ou mais); menores de 14 = população − pessoas de 14 anos ou mais. Para regiões e UFs, o IBGE não divulgou estimativas em número de pessoas do 2º tri de 2020 ao 1º tri de 2022 (pandemia), por isso o intervalo em branco.
 :::
 
+# Massa salarial {scrolling="true"}
+
+```{r}
+#| include: false
+massa_ufs <- ufs |>
+  arrange(cod, data) |>
+  group_by(cod) |>
+  mutate(var12 = 100 * (massa / lag(massa, 4) - 1)) |>
+  ungroup() |>
+  group_by(data) |>
+  mutate(part = 100 * massa / sum(massa)) |>
+  ungroup()
+massa_ult <- massa_ufs |> filter(data == ult_data)
+fmt_bi  <- \(x) scales::number(x / 1000, accuracy = 0.1, big.mark = ".", decimal.mark = ",", prefix = "R$ ", suffix = " bi")
+fmt_pct <- \(x) scales::number(x, accuracy = 0.1, decimal.mark = ",", suffix = "%")
+
+barras_uf <- function(var) {
+  d <- massa_ult |>
+    mutate(valor = .data[[var]], local = reorder(local, valor),
+           texto = paste0(local, ": ", fmt_pct(valor), "<br>Massa: ", fmt_bi(massa)))
+  g <- ggplot(d, aes(valor, local, fill = regiao, text = texto)) +
+    geom_col(width = 0.75) +
+    scale_fill_manual(values = cores_reg, name = NULL) +
+    labs(x = NULL, y = NULL) +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.y = element_text(size = 7.5), panel.grid.major.y = element_blank())
+    ggplotly(g, tooltip = "text") |> layout(legend = list(orientation = "h", y = -0.06, yanchor = "top"))
+}
+```
+
+## Row {height=50%}
+
+### Column {width=50%}
+
+```{r}
+#| title: "Massa de rendimento real habitual · Brasil (R$ bilhões por mês, preços do último trimestre)"
+d <- painel |>
+  filter(nivel == "Brasil") |>
+  mutate(texto = paste0(tri, "º tri ", ano, ": ", fmt_bi(massa)))
+g <- ggplot(d, aes(data, massa / 1000, group = 1, text = texto)) +
+  geom_line(colour = "#0f4c5c", linewidth = 0.8) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 10)
+ggplotly(g, tooltip = "text")
+```
+
+### Column {width=50%}
+
+```{r}
+#| title: "Participação das Grandes Regiões na massa (%)"
+d <- painel |>
+  filter(nivel == "Grande Região") |>
+  group_by(data) |>
+  mutate(part = 100 * massa / sum(massa)) |>
+  ungroup() |>
+  mutate(local = factor(local, levels = c("Norte", "Nordeste", "Centro-Oeste", "Sul", "Sudeste")),
+         texto = paste0(local, " — ", tri, "º tri ", ano, ": ", fmt_pct(part)))
+g <- ggplot(d, aes(data, part, fill = local, text = texto)) +
+  geom_col(width = 80) +
+  scale_fill_manual(values = cores_reg, name = NULL) +
+  scale_y_continuous(breaks = c(0, 50, 100)) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 10)
+ggplotly(g, tooltip = "text") |> layout(legend = list(orientation = "h", y = -0.08, yanchor = "top"))
+```
+
+## Row {.tabset height=50%}
+
+```{r}
+#| title: "UFs · Participação na massa"
+barras_uf("part")
+```
+
+```{r}
+#| title: "UFs · Variação real em 12 meses"
+barras_uf("var12")
+```
+
 # Sobre
 
 ## Row
@@ -294,7 +372,7 @@ Cada barra soma 100% da população residente no trimestre. Fontes: SIDRA, tabel
 ::: {.card title="Sobre este painel"}
 **Fonte:** IBGE, Pesquisa Nacional por Amostra de Domicílios Contínua (PNAD Contínua) trimestral, via SIDRA:
 tabelas 4099 (desocupação e subutilização), 6466 (nível da ocupação), 8529 (informalidade, desde o 4º tri de 2015)
-e 6472 (rendimento médio mensal real habitual de todos os trabalhos).
+e 6472 (rendimento médio mensal real habitual de todos os trabalhos) , 6474 (massa de rendimento mensal real habitual de todos os trabalhos, em R$ a preços do último trimestre).
 
 **Recorte:** Brasil, 5 Grandes Regiões e 27 Unidades da Federação, do 1º trimestre de 2012 ao `r periodo`.
 
