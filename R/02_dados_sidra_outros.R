@@ -8,7 +8,8 @@ source("R/00_pacotes.R")
 consultas <- c(
   "/t/6466/n1/all/n2/all/n3/all/v/4097,4101/p/all",
   "/t/8529/n1/all/n2/all/n3/all/v/12466,12467/p/all",
-  "/t/6472/n1/all/n2/all/n3/all/v/5933,5941/p/all"
+  "/t/6472/n1/all/n2/all/n3/all/v/5933,5941/p/all",
+  "/t/6474/n1/all/n2/all/n3/all/v/6293,6294/p/all"   # massa real habitual (milhões de R$) e CV
 )
 
 # Baixa as três tabelas e empilha num único data frame
@@ -25,7 +26,8 @@ outros <- brutos |>
     indicador = recode(variavel_codigo,
                        "4097"  = "ocupacao",      "4101"  = "ocupacao_cv",
                        "12466" = "informalidade", "12467" = "informalidade_cv",
-                       "5933"  = "rendimento",    "5941"  = "rendimento_cv"),
+                       "5933"  = "rendimento",    "5941"  = "rendimento_cv",
+                       "6293"  = "massa",         "6294"  = "massa_cv"),
     valor
   ) |>
   pivot_wider(names_from = indicador, values_from = valor)
